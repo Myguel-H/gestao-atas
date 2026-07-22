@@ -230,8 +230,8 @@ export function AtaUpload() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <Field label="Código" value={row.codigo} onChange={(v) => updateRow(row.key, "codigo", v)} />
                   <Field label="Marca" value={row.marca} onChange={(v) => updateRow(row.key, "marca", v)} />
+                  <Field label="Unidade Med." value={row.unidade} onChange={(v) => updateRow(row.key, "unidade", v)} />
                   <Field label="Valor unitário" value={row.valorUnitario} onChange={(v) => updateRow(row.key, "valorUnitario", v)} />
-                  <Field label="Unidade" value={row.unidade} onChange={(v) => updateRow(row.key, "unidade", v)} />
                 </div>
                 <div className="mt-3 flex flex-col gap-1.5">
                   <Label className="text-xs text-muted-foreground">Descritivo</Label>

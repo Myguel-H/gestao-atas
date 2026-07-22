@@ -4,7 +4,7 @@ import { db } from "@/lib/db"
 import { atas, itens } from "@/lib/db/schema"
 import type { Ata, Item } from "@/lib/db/schema"
 import { parsePdf, type ParsedItem, type Modelo } from "@/lib/pdf-parser"
-import { and, desc, eq, ilike, sql } from "drizzle-orm"
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
 export async function parsePdfAction(
@@ -193,13 +193,25 @@ export async function updateAtaAction(input: {
 }
 
 export async function searchItemsAction(input: {
-  ataId: number
+  ataIds: number[]
   query: string
 }) {
   const q = input.query.trim()
-  const conditions = [eq(itens.ataId, input.ataId)]
+  const conditions = [] as any[]
+  if (input.ataIds.length > 0) {
+    conditions.push(inArray(itens.ataId, input.ataIds))
+  }
   if (q) {
-    conditions.push(ilike(itens.codigo, `%${q}%`))
+    conditions.push(
+      or(
+        ilike(itens.codigo, `%${q}%`),
+        ilike(itens.descricao, `%${q}%`),
+        ilike(itens.marca, `%${q}%`),
+      ),
+    )
+  }
+  if (conditions.length === 0) {
+    return []
   }
   return db
     .select()

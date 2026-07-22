@@ -1,5 +1,11 @@
 from pathlib import Path
 import re
+import sys
+
+if len(sys.argv) > 1:
+    ata_num = sys.argv[1]
+else:
+    ata_num = '10/2026'
 
 source = Path('scripts/extracted_ata_items.txt')
 if not source.exists():
@@ -24,16 +30,18 @@ for entry in entries:
         'unidade': data.get('UNIDADE_MEDIDA', ''),
     })
 
-output = Path('scripts/insert_itens_02_2026.sql')
+safe_ata = ata_num.replace('/', '_')
+output = Path(f'scripts/insert_ata_{safe_ata}.sql')
+
+def esc(s: str) -> str:
+    return s.replace("'", "''")
+
 with output.open('w', encoding='utf-8') as f:
-    f.write("INSERT INTO atas (numero, descricao, modelo) SELECT '02/2026', 'Ata 02/2026', 'novo' WHERE NOT EXISTS (SELECT 1 FROM atas WHERE numero = '02/2026');\n")
-    f.write("\n")
+    f.write(f"INSERT INTO atas (numero, descricao, modelo) SELECT '{ata_num}', 'Ata {ata_num}', 'novo' WHERE NOT EXISTS (SELECT 1 FROM atas WHERE numero = '{ata_num}');\n\n")
     for r in rows:
-        def esc(s):
-            return s.replace("'", "''")
         f.write(
-            "INSERT INTO itens (ata_id, codigo, descricao, valor_unitario, marca, unidade) SELECT (SELECT id FROM atas WHERE numero='02/2026'), '{}' ,'{}','{}','{}','{}' WHERE NOT EXISTS (SELECT 1 FROM itens i JOIN atas a ON i.ata_id=a.id WHERE a.numero='02/2026' AND i.codigo='{}');\n".format(
-                esc(r['codigo']), esc(r['descricao']), esc(r['valor_unitario']), esc(r['marca']), esc(r['unidade']), esc(r['codigo'])
+            "INSERT INTO itens (ata_id, codigo, descricao, valor_unitario, marca, unidade) SELECT (SELECT id FROM atas WHERE numero='{}'), '{}' ,'{}','{}','{}','{}' WHERE NOT EXISTS (SELECT 1 FROM itens i JOIN atas a ON i.ata_id = a.id WHERE a.numero = '{}' AND i.codigo = '{}');\n".format(
+                esc(ata_num), esc(r['codigo']), esc(r['descricao']), esc(r['valor_unitario']), esc(r['marca']), esc(r['unidade']), esc(ata_num), esc(r['codigo'])
             )
         )
 print(f'wrote {len(rows)} insert statements to {output}')

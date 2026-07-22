@@ -1,5 +1,5 @@
+import Image from "next/image"
 import Link from "next/link"
-import { FileSearch } from "lucide-react"
 
 export function AppHeader({
   active,
@@ -14,23 +14,23 @@ export function AppHeader({
     }`
 
   return (
-    <header className="border-b border-border bg-card">
-      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <FileSearch className="h-5 w-5" />
-          </span>
-          <span className="text-base font-semibold text-foreground">
-            Consulta de Atas
-          </span>
+    <header className="border-b border-border bg-card/95 backdrop-blur-sm">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="relative h-12 w-[180px] min-w-[140px]">
+            <Image
+              src="/logoconsud.png"
+              alt="Logo Consud"
+              width={180}
+              height={48}
+              className="object-contain"
+            />
+          </div>
         </Link>
-        <nav className="flex items-center gap-6">
-          <Link href="/" className={linkCls("consulta")}>
-            Consultar
-          </Link>
-          <Link href="/atas" className={linkCls("atas")}>
-            Gerenciar atas
-          </Link>
+
+        <nav className="flex items-center gap-8 text-sm font-medium tracking-wide">
+          <Link href="/" className={linkCls("consulta")}>Consultar</Link>
+          <Link href="/atas" className={linkCls("atas")}>Gerenciar atas</Link>
         </nav>
       </div>
     </header>

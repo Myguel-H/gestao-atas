@@ -176,14 +176,14 @@ export function AtaEdit({ ata, items }: AtaEditProps) {
                   onChange={(v) => updateRow(row.key, "marca", v)}
                 />
                 <Field
+                  label="Unidade Med."
+                  value={row.unidade ?? ""}
+                  onChange={(v) => updateRow(row.key, "unidade", v)}
+                />
+                <Field
                   label="Valor unitário"
                   value={row.valorUnitario ?? ""}
                   onChange={(v) => updateRow(row.key, "valorUnitario", v)}
-                />
-                <Field
-                  label="Unidade"
-                  value={row.unidade ?? ""}
-                  onChange={(v) => updateRow(row.key, "unidade", v)}
                 />
               </div>
               <div className="mt-3 flex flex-col gap-1.5">

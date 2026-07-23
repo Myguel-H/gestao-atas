@@ -120,6 +120,87 @@ export async function getAtaByIdAction(ataId: number) {
   return { ata, items }
 }
 
+export async function getItemWithAtaAction(itemId: number) {
+  if (!Number.isInteger(itemId) || itemId <= 0) {
+    return null
+  }
+
+  const [item] = await db.select().from(itens).where(eq(itens.id, itemId)).limit(1)
+  if (!item) return null
+
+  const [ata] = await db.select().from(atas).where(eq(atas.id, item.ataId)).limit(1)
+  return { ata: ata ?? null, item }
+}
+
+export async function updateItemAction(input: {
+  itemId: number
+  codigo: string
+  descricao: string
+  valorUnitario: string
+  marca: string
+  unidade: string
+  quantidade: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const codigo = input.codigo.trim()
+  const descricao = input.descricao.trim()
+
+  if (!codigo) return { ok: false, error: "Informe o código do item." }
+  if (!descricao) return { ok: false, error: "Informe a descrição do item." }
+
+  try {
+    await db
+      .update(itens)
+      .set({
+        codigo,
+        descricao,
+        valorUnitario: input.valorUnitario.trim() || null,
+        marca: input.marca.trim() || null,
+        unidade: input.unidade.trim() || null,
+        quantidade: input.quantidade.trim() || null,
+      })
+      .where(eq(itens.id, input.itemId))
+
+    const [item] = await db.select().from(itens).where(eq(itens.id, input.itemId)).limit(1)
+
+    revalidatePath("/")
+    revalidatePath("/atas")
+    revalidatePath(`/item/${input.itemId}`)
+    if (item?.ataId) {
+      revalidatePath(`/atas/${item.ataId}`)
+    }
+    return { ok: true }
+  } catch (e) {
+    console.log("[v0] Erro ao atualizar item:", e instanceof Error ? e.message : e)
+    return { ok: false, error: "Erro ao atualizar o item." }
+  }
+}
+
+export async function deleteItemAction(input: { itemId: number }): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!Number.isInteger(input.itemId) || input.itemId <= 0) {
+    return { ok: false, error: "Item inválido." }
+  }
+
+  try {
+    const [item] = await db.select().from(itens).where(eq(itens.id, input.itemId)).limit(1)
+    if (!item) {
+      return { ok: false, error: "Item não encontrado." }
+    }
+
+    await db.delete(itens).where(eq(itens.id, input.itemId))
+
+    revalidatePath("/")
+    revalidatePath("/atas")
+    if (item.ataId) {
+      revalidatePath(`/atas/${item.ataId}`)
+    }
+
+    return { ok: true }
+  } catch (e) {
+    console.log("[v0] Erro ao excluir item:", e instanceof Error ? e.message : e)
+    return { ok: false, error: "Erro ao excluir o item." }
+  }
+}
+
 export async function updateAtaAction(input: {
   ataId: number
   numero: string

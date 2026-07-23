@@ -63,18 +63,7 @@ export function AtasManager({ atas }: { atas: AtaWithCount[] }) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {Number.isInteger(ata.id) && ata.id > 0 ? (
-                <Link
-                  href={`/atas/${String(ata.id)}`}
-                  className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "inline-flex items-center justify-center")}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Link>
-              ) : (
-                <Button variant="ghost" size="sm" disabled>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              )}
+              
               <Button
                 variant="ghost"
                 size="sm"

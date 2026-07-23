@@ -3,12 +3,13 @@
 import Link from "next/link"
 import { useState, useTransition } from "react"
 import type { Ata, Item } from "@/lib/db/schema"
-import { searchItemsAction } from "@/app/actions/atas"
+import { searchItemsAction, updateItemAction, deleteItemAction } from "@/app/actions/atas"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Search, PackageSearch, ChevronDown, ChevronUp } from "lucide-react"
+import { Search, PackageSearch, ChevronDown, ChevronUp, Edit3, Trash2 } from "lucide-react"
+import { toast } from "sonner"
 
 export function SearchView({ atas }: { atas: Ata[] }) {
   const [selectedAtas, setSelectedAtas] = useState<number[]>(
@@ -16,6 +17,7 @@ export function SearchView({ atas }: { atas: Ata[] }) {
   )
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<Item[] | null>(null)
+  const [editRows, setEditRows] = useState<Record<number, { codigo: string; descricao: string; valorUnitario: string; marca: string; unidade: string; quantidade: string }>>({})
   const [isPending, startTransition] = useTransition()
   const [isAtaMenuOpen, setIsAtaMenuOpen] = useState(false)
 
@@ -23,6 +25,95 @@ export function SearchView({ atas }: { atas: Ata[] }) {
     setSelectedAtas((prev) =>
       prev.includes(ataId) ? prev.filter((id) => id !== ataId) : [...prev, ataId],
     )
+  }
+
+  function startEdit(item: Item) {
+    setEditRows((prev) => ({
+      ...prev,
+      [item.id]: {
+        codigo: item.codigo,
+        descricao: item.descricao,
+        valorUnitario: item.valorUnitario ?? "",
+        marca: item.marca ?? "",
+        unidade: item.unidade ?? "",
+        quantidade: item.quantidade ?? "",
+      },
+    }))
+  }
+
+  function cancelEdit(itemId: number) {
+    setEditRows((prev) => {
+      const next = { ...prev }
+      delete next[itemId]
+      return next
+    })
+  }
+
+  function updateDraft(itemId: number, field: keyof typeof editRows[number], value: string) {
+    setEditRows((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: value,
+      },
+    }))
+  }
+
+  function saveItem(itemId: number) {
+    const draft = editRows[itemId]
+    if (!draft) return
+
+    startTransition(async () => {
+      try {
+        const res = await updateItemAction({
+          itemId,
+          codigo: draft.codigo,
+          descricao: draft.descricao,
+          valorUnitario: draft.valorUnitario,
+          marca: draft.marca,
+          unidade: draft.unidade,
+          quantidade: draft.quantidade,
+        })
+
+        if (res.ok) {
+          setResults((prev) =>
+            prev
+              ? prev.map((item) =>
+                  item.id === itemId ? { ...item, ...draft } : item,
+                )
+              : prev,
+          )
+          cancelEdit(itemId)
+          toast.success("Item atualizado com sucesso.")
+        } else {
+          toast.error(res.error)
+        }
+      } catch (err) {
+        console.error(err)
+        toast.error("Falha ao atualizar o item. Tente novamente.")
+      }
+    })
+  }
+
+  function deleteItem(itemId: number) {
+    const confirmed = window.confirm("Deseja excluir este item? Esta ação não pode ser desfeita.")
+    if (!confirmed) return
+
+    startTransition(async () => {
+      try {
+        const res = await deleteItemAction({ itemId })
+        if (res.ok) {
+          setResults((prev) => prev ? prev.filter((item) => item.id !== itemId) : prev)
+          cancelEdit(itemId)
+          toast.success("Item excluído com sucesso.")
+        } else {
+          toast.error(res.error)
+        }
+      } catch (err) {
+        console.error(err)
+        toast.error("Falha ao excluir o item. Tente novamente.")
+      }
+    })
   }
 
   function runSearch() {
@@ -142,7 +233,18 @@ export function SearchView({ atas }: { atas: Ata[] }) {
         </CardContent>
       </Card>
 
-      {results !== null && <ResultsList results={results} query={query} />}
+      {results !== null && (
+        <ResultsList
+          results={results}
+          query={query}
+          editRows={editRows}
+          onStartEdit={startEdit}
+          onCancelEdit={cancelEdit}
+          onSaveItem={saveItem}
+          onDeleteItem={deleteItem}
+          onUpdateDraft={updateDraft}
+        />
+      )}
     </div>
   )
 }
@@ -162,7 +264,25 @@ function highlightText(text: string, query: string) {
   )
 }
 
-function ResultsList({ results, query }: { results: Item[]; query: string }) {
+function ResultsList({
+  results,
+  query,
+  editRows,
+  onStartEdit,
+  onCancelEdit,
+  onSaveItem,
+  onDeleteItem,
+  onUpdateDraft,
+}: {
+  results: Item[]
+  query: string
+  editRows: Record<number, { codigo: string; descricao: string; valorUnitario: string; marca: string; unidade: string; quantidade: string }>
+  onStartEdit: (item: Item) => void
+  onCancelEdit: (itemId: number) => void
+  onSaveItem: (itemId: number) => void
+  onDeleteItem: (itemId: number) => void
+  onUpdateDraft: (itemId: number, field: keyof typeof editRows[number], value: string) => void
+}) {
   if (results.length === 0) {
     return (
       <Card>
@@ -178,40 +298,123 @@ function ResultsList({ results, query }: { results: Item[]; query: string }) {
       <p className="text-sm text-muted-foreground">
         {results.length} {results.length === 1 ? "item encontrado" : "itens encontrados"}
       </p>
-      {results.map((item) => (
-        <Card key={item.id}>
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-center gap-2">
-               <p>Cód Material : </p> 
-               <span className="rounded-md bg-accent px-2.5 py-1 font-mono text-sm font-semibold text-accent-foreground">
-                  {item.codigo}
-                </span>
-              </div>
-              {item.valorUnitario && (
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Valor unitário</p>
-                  <p className="text-lg font-semibold text-foreground">
-                    R$ {item.valorUnitario}
-                  </p>
+      {results.map((item) => {
+        const draft = editRows[item.id]
+        const isEditing = Boolean(draft)
+
+        return (
+          <Card key={item.id}>
+            <CardContent className="pt-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <p>Cód Material : </p>
+                  <span className="rounded-md bg-accent px-2.5 py-1 font-mono text-sm font-semibold text-accent-foreground">
+                    {item.codigo}
+                  </span>
                 </div>
+                <div className="flex items-center gap-4">
+                  {item.valorUnitario && !isEditing && (
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Valor unitário</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        R$ {item.valorUnitario}
+                      </p>
+                    </div>
+                  )}
+                  {!isEditing ? (
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => onStartEdit(item)}>
+                        <Edit3 className="mr-1 h-4 w-4" />
+                        Editar
+                      </Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => onDeleteItem(item.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button type="button" variant="secondary" size="sm" onClick={() => onSaveItem(item.id)}>
+                        Salvar
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => onCancelEdit(item.id)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isEditing ? (
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={`codigo-${item.id}`}>Código</Label>
+                    <Input
+                      id={`codigo-${item.id}`}
+                      value={draft.codigo}
+                      onChange={(e) => onUpdateDraft(item.id, "codigo", e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={`valorUnitario-${item.id}`}>Valor unitário</Label>
+                    <Input
+                      id={`valorUnitario-${item.id}`}
+                      value={draft.valorUnitario}
+                      onChange={(e) => onUpdateDraft(item.id, "valorUnitario", e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={`marca-${item.id}`}>Marca</Label>
+                    <Input
+                      id={`marca-${item.id}`}
+                      value={draft.marca}
+                      onChange={(e) => onUpdateDraft(item.id, "marca", e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor={`unidade-${item.id}`}>Unidade Med.</Label>
+                    <Input
+                      id={`unidade-${item.id}`}
+                      value={draft.unidade}
+                      onChange={(e) => onUpdateDraft(item.id, "unidade", e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <Label htmlFor={`quantidade-${item.id}`}>Quantidade</Label>
+                    <Input
+                      id={`quantidade-${item.id}`}
+                      value={draft.quantidade}
+                      onChange={(e) => onUpdateDraft(item.id, "quantidade", e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <Label htmlFor={`descricao-${item.id}`}>Descrição</Label>
+                    <Input
+                      id={`descricao-${item.id}`}
+                      value={draft.descricao}
+                      onChange={(e) => onUpdateDraft(item.id, "descricao", e.target.value)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="mt-3 text-sm leading-relaxed text-foreground">
+                    {highlightText(item.descricao, query)}
+                  </p>
+                  <br />
+                  <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                    {item.marca && (
+                      <span>Marca do item: {highlightText(item.marca, query)}</span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+                    {item.unidade && <span>Unidade Med. : {item.unidade}</span>}
+                  </div>
+                </>
               )}
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-foreground">
-              {highlightText(item.descricao, query)}
-            </p>
-            <br />
-            <div className="mt-3 fleax flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-              {item.marca && (
-                <span>Marca do item: {highlightText(item.marca, query)}</span>
-              )}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-              {item.unidade && <span>Unidade Med. : {item.unidade}</span>}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }
